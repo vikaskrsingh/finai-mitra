@@ -1,0 +1,68 @@
+name: Terraform GCP Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**' # Trigger on changes in the terraform directory
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+env:
+  TF_WORKING_DIR: ./terraform # Directory where Terraform files are located
+  GCP_PROJECT_ID: finai-mitra-project # Replace with your GCP project ID (e.g., 'my-finai-project-12345')
+  GCP_REGION: us-central1 # Replace with your desired region (e.g., 'us-central1' or 'asia-south1')
+
+permissions:
+  contents: 'read'
+  id-token: 'write' # Required for Workload Identity Federation
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # Replace with your Workload Identity Pool Provider Path
+          # Format: 'projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/[POOL_ID]/providers/[PROVIDER_ID]'
+          workload_identity_provider: 'projects/[YOUR_GCP_PROJECT_NUMBER]/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-sa@[YOUR_GCP_PROJECT_ID].iam.gserviceaccount.com' # Replace with your SA email
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.x.x # Specify a compatible version, e.g., 1.7.5
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -input=false -out=tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true # Allow plan to fail if changes are destructive (manual review needed)
+
+      - name: Terraform Apply (Auto-approve for 'main' branch, or add manual approval step)
+        id: apply
+        if: github.ref == 'refs/heads/main' && steps.plan.outcome == 'success'
+        run: terraform apply -input=false tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        # For production, consider adding an environment approval step before `terraform apply`
+        # environments:
+        #   - name: production
+        #     url: ${{ steps.apply.outputs.cloud_run_service_url }} # Output from Cloud Run deployment

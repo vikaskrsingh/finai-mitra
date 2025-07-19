@@ -1,0 +1,67 @@
+name: Deploy FinAI Mitra to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'       # Trigger on changes in the source code
+      - 'Dockerfile'   # Trigger on Dockerfile changes
+      - 'requirements.txt' # Trigger on dependency changes
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+env:
+  GCP_PROJECT_ID: finai-mitra-project # Replace with your GCP project ID (e.g., 'my-finai-project-12345')
+  GCP_REGION: us-central1               # Must match your Terraform region
+  SERVICE_NAME: finai-mitra-app         # Must match your Terraform Cloud Run service name
+  ARTIFACT_REGISTRY_REPO: finai-mitra-repo # Must match your Terraform Artifact Registry name
+  IMAGE_NAME: finai-mitra               # Name for your Docker image
+  GCS_BUCKET_NAME: finai-mitra-docs-bucket # Must match your Terraform GCS bucket name
+
+permissions:
+  contents: 'read'
+  id-token: 'write' # Required for Workload Identity Federation
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # Replace with your Workload Identity Pool Provider Path
+          # Format: 'projects/[PROJECT_NUMBER]/locations/global/workloadIdentityPools/[POOL_ID]/providers/[PROVIDER_ID]'
+          workload_identity_provider: 'projects/[YOUR_GCP_PROJECT_NUMBER]/locations/global/workloadIdentityPools/github-pool/providers/github-provider'
+          service_account: 'github-actions-sa@[YOUR_GCP_PROJECT_ID].iam.gserviceaccount.com' # Replace with your SA email
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev
+
+      - name: Build and Push Docker image to Artifact Registry
+        run: |
+          docker build -t ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:${{ github.sha }} .
+          docker push ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:${{ github.sha }}
+          # Also push with 'latest' tag for easier reference, but use SHA for specific deployments
+          docker tag ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:${{ github.sha }} ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:latest
+          docker push ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:latest
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REGISTRY_REPO}/${IMAGE_NAME}:${{ github.sha }}
+          region: ${{ env.GCP_REGION }}
+          # The service account should already be defined in Terraform for Cloud Run runtime
+          # service_account: github-actions-sa@[YOUR_GCP_PROJECT_ID].iam.gserviceaccount.com # Not needed here if set in Terraform for Cloud Run runtime
+
+      - name: Show Cloud Run URL
+        run: |
+          echo "Cloud Run service URL: \"${{ steps.deploy.outputs.url }}\""
