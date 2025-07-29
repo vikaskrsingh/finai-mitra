@@ -7,13 +7,13 @@ load_dotenv()
 # --- GCP Configuration ---
 # Get GCP Project ID from environment variable or hardcode if not set
 # It's recommended to set this as an environment variable in production
-GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "finai-mitra-project-466614")
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "hack-team-coding-ninjas")
 GCP_REGION = os.getenv("GCP_REGION", "us-central1") # Default region for Vertex AI, Cloud Run, Storage
 
 # --- Application Specific Configuration ---
 MAX_SUMMARY_WORDS = 250 # Max words for AI summarization
 TEMP_UPLOAD_DIR = "temp_uploads" # Directory to temporarily store uploaded files
-GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "finai-mitra-docs-bucket") # This MUST match your Terraform bucket name
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "hack-team-coding-ninjas-finai-mitra-docs-bucket") # This MUST match your Terraform bucket name
 
 # --- AI Model Configuration ---
 # You can specify the model if needed, or let Vertex AI pick latest compatible

@@ -1,4 +1,5 @@
 # src/ui/components.py
+import re
 
 import streamlit as st
 import os
@@ -28,7 +29,7 @@ def render_input_section():
 
 def render_config_section():
     """Renders the configuration options."""
-    st.subheader("2. Configuration")
+
     
     # Select Country
     selected_country = st.selectbox("Select Country", COUNTRIES, key="country_select")
@@ -100,13 +101,22 @@ def render_output_section(action):
         
         if st.button("▶️ Read Output Aloud", help="Click to generate and play the audio of the processed text."):
             if st.session_state.get('processed_output'): # Check if output exists
+                print("Processed Output", st.session_state.get('processed_output'))
+                cleaned = st.session_state.get('processed_output').replace("*","").replace(".","").replace(":","")
+                print("Cleaned output",cleaned)
                 with st.spinner(f"Generating audio for {selected_tts_lang_key} ({selected_tts_lang_code})... This might take a moment."):
                     audio_bytes = synthesize_text_to_audio(
-                        st.session_state.processed_output,
+                        cleaned,
                         language_code=selected_tts_lang_code # Use the BCP-47 code here
                     )
                 if audio_bytes:
                     st.audio(audio_bytes, format='audio/mp3', start_time=0)
+                    st.download_button(
+                        label="💾 Download Audio",
+                        data=audio_bytes,
+                        file_name="output_audio.mp3",
+                        mime="audio/mp3"
+                    )
                     st.success("Audio playback ready! You can now listen to the output.")
                 else:
                     st.error("Failed to generate audio. Please ensure the 'Cloud Text-to-Speech API' is enabled and your authentication is set up correctly.")
@@ -117,36 +127,37 @@ def render_output_section(action):
 
 def render_qa_section():
     """Renders the Q&A section."""
-    st.subheader("4. Ask a Question (Q&A)")
+    st.subheader("Ask a Question (Q&A)")
     user_question = st.text_input("Ask about the document or summary:", key="qa_input")
+    value = st.button("Submit QA")
 
     # Check if a question is provided
-    if user_question:
+    if user_question and value:
         if not st.session_state.get('current_summary'):
             st.warning("Please process a document first to generate a summary or output for Q&A.")
-        else:
-            try:
-                # Generate the Q&A prompt
-                qa_prompt = get_qa_prompt(
-                    st.session_state.current_summary,  # Use the processed summary
-                    user_question,
-                    st.session_state.selected_language_iso_code  # Language for Q&A
-                )
-
-                # Call the LLM API to get the answer
-                with st.spinner("Getting answer from AI..."):
-                    answer = call_gemini_api(qa_prompt, st.session_state.selected_language_iso_code)
-
-                # Update the session state with the answer
-                st.session_state.qa_answer = answer
-                st.success("Answer generated successfully!")
-            except Exception as e:
-                logger.exception("Error during Q&A processing.")
-                st.error(f"An error occurred while generating the answer: {e}")
+        # else:
+        #     try:
+        #         # Generate the Q&A prompt
+        #         qa_prompt = get_qa_prompt(
+        #             st.session_state.current_summary,  # Use the processed summary
+        #             user_question,
+        #             st.session_state.selected_language_iso_code  # Language for Q&A
+        #         )
+        #
+        #         # Call the LLM API to get the answer
+        #         with st.spinner("Getting answer from AI..."):
+        #             answer = call_gemini_api(qa_prompt, st.session_state.selected_language_iso_code)
+        #
+        #         # Update the session state with the answer
+        #         st.session_state.qa_answer = answer
+        #         st.success("Answer generated successfully!")
+        #     except Exception as e:
+        #         logger.exception("Error during Q&A processing.")
+        #         st.error(f"An error occurred while generating the answer: {e}")
 
     # Display the answer if available
-    if st.session_state.get('qa_answer'):
-        st.markdown(f"**Answer:** {st.session_state.qa_answer}")
+    # if st.session_state.get('qa_answer'):
+    #     st.markdown(f"**Answer:** {st.session_state.qa_answer}")
 
     return user_question
 

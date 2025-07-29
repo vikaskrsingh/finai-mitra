@@ -24,7 +24,8 @@ COUNTRY_LANGUAGES = {
 
 ACTIONS = [
     "Summarize",
-    "Simplify"
+    "Simplify",
+    "Financial Planning"
 ]
 
 # Supported languages for Text-to-Speech (ISO 639-1 code for voice selection)

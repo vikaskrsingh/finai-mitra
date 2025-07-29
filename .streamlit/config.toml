@@ -1,0 +1,6 @@
+    [theme]
+    primaryColor="#F63366"  # Example primary color
+    backgroundColor="#FFFFFF" # Example background color
+    secondaryBackgroundColor="#F0F2F6" # Example secondary background color (for sidebar/widgets)
+    textColor="#262730" # Example text color
+    font="sans serif" # Example font

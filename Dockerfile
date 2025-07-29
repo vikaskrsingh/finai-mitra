@@ -1,21 +1,35 @@
-# Use a Python base image
-FROM python:3.10-slim-buster
+FROM python:3.11-slim
 
-# Set working directory in the container
-WORKDIR /app
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Copy requirements file and install dependencies
+# Set working directory inside container
+WORKDIR /
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc libglib2.0-0 libsm6 libxrender1 libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    curl \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first (to leverage Docker cache)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY .streamlit/ /.streamlit/
 
-# Copy the entire source code
+# Install Python packages
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Copy source code
 COPY src/ ./src/
 
-# Expose the port Streamlit runs on
-EXPOSE 8501
+# Expose Streamlit default port
+EXPOSE 8080
 
-# Set environment variable for Streamlit server port
-ENV PORT=8501
-
-# Command to run the Streamlit application
-CMD ["streamlit", "run", "src/main_app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+# Start Streamlit
+CMD ["streamlit", "run", "src/main_app.py", "--server.port=8080", "--server.enableCORS=false"]
